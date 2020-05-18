@@ -15,12 +15,15 @@ MODULE_LICENSE("GPL");
 
 int handle_genl_pingpong(struct sk_buff *ping_skb, struct genl_info *info);
 int handle_genl_hello(struct sk_buff *hello_skb, struct genl_info *info);
+int handle_genl_pingpong_random(struct sk_buff *ping_skb,
+				struct genl_info *info);
 
 /* genl cmds */
 enum our_genl_cmds {
 	GENL_CMD_UNSPEC,	/* avoid using 0 */
 	GENL_CMD_HELLO,
 	GENL_CMD_PINGPONG,
+	GENL_CMD_PINGPONG_RANDOM,
 };
 
 /* attributes */
@@ -28,6 +31,7 @@ enum our_genl_attrs {
 	GENL_ATTR_UNSPEC,	/* avoid using 0 */
 	GENL_ATTR_HELLO_MSG,
 	GENL_ATTR_PINGPONG_MSG,
+	GENL_ATTR_PINGPONG_RANDOM_MSG,
 	__GENL_ATTR__MAX,
 };
 #define OUR_GENL_ATTR_MAX (__GENL_ATTR__MAX - 1)
@@ -42,6 +46,10 @@ static const struct nla_policy our_genl_policy[OUR_GENL_ATTR_MAX + 1] = {
 				.type = NLA_STRING,
 				.len = PINGPONG_MSG_LEN,
 				},
+	[GENL_ATTR_PINGPONG_RANDOM_MSG] = {
+				.type = NLA_STRING,
+				.len = PINGPONG_MSG_LEN,
+				},
 };
 
 /* genl_ops definition */
@@ -53,6 +61,10 @@ static const struct genl_ops our_genl_ops[] = {
 	{
 		.cmd = GENL_CMD_PINGPONG,
 		.doit = handle_genl_pingpong,
+	},
+	{
+		.cmd = GENL_CMD_PINGPONG_RANDOM,
+		.doit = handle_genl_pingpong_random,
 	},
 };
 
@@ -69,6 +81,48 @@ static struct genl_family our_genl_family = {
 	.n_ops = ARRAY_SIZE(our_genl_ops),
 };
 
+int handle_genl_pingpong_random(struct sk_buff *ping_skb, struct genl_info *info)
+{
+	char *ping_msg, *pong_msg = "Pong from kernel!";
+	struct nlattr *na;
+	struct sk_buff *pong_skb;
+	void *msghead;
+	int n;
+
+	na = info->attrs[GENL_ATTR_PINGPONG_RANDOM_MSG];
+	if (!na) {
+		pr_err("genl_kernel: %s Empty msg from %d\n", __func__,
+		       info->snd_portid);
+		return -EINVAL;
+	}
+
+	/* received ping msg */
+	ping_msg = (char *)nla_data(na);
+	pr_info("genl_kenel:%s src=%u msg=%s\n", __func__, info->snd_portid,
+		ping_msg);
+
+	/* send few random pongs to demonstrate multi-part msgs */
+	n = jiffies % 10; /* up to 10 pongs */
+	do {
+		pong_skb = genlmsg_new(NLMSG_GOODSIZE, GFP_KERNEL);
+		msghead = genlmsg_put(pong_skb, 0, info->snd_seq,
+					&our_genl_family, NLM_F_MULTI,
+					GENL_CMD_PINGPONG_RANDOM);
+		nla_put_string(pong_skb, GENL_ATTR_PINGPONG_RANDOM_MSG,
+				pong_msg);
+		genlmsg_end(pong_skb, msghead);
+
+		pr_info("genl_kenel:%s sending pong_msg=%s\n", __func__, pong_msg);
+		genlmsg_unicast(genl_info_net(info), pong_skb, info->snd_portid);
+	} while (n--);
+
+	/* finish multi-part msg */
+	pong_skb = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	nlmsg_put(pong_skb, info->snd_portid, info->snd_seq, NLMSG_DONE, 0, 0);
+	genlmsg_unicast(genl_info_net(info), pong_skb, info->snd_portid);
+
+	return 0;
+}
 int handle_genl_pingpong(struct sk_buff *ping_skb, struct genl_info *info)
 {
 	char *ping_msg, *pong_msg = "Pong from kernel!";
