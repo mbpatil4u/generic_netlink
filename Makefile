@@ -29,4 +29,4 @@ clean_user:
 
 run_user:
 	make all_user
-	./genl_user
+	./genl_user -p
