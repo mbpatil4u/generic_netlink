@@ -22,7 +22,7 @@ run:
 	make uninstall
 
 all_user:
-	gcc -o genl_user genl_user.c
+	gcc -g -I/usr/include/libnl3 -l nl-3 -l nl-genl-3 -o genl_user genl_user.c
 
 clean_user:
 	rm -f genl_user
