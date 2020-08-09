@@ -1,5 +1,16 @@
 obj-m += genl_kernel.o
 
+help:
+	@echo "possible targets"
+	@echo "all 		- build genl_kernel.ko and genl_user"
+	@echo "clean 		- clean genl_kernel.ko and genl_user"
+	@echo "install		- 'make all; make uninstall' and then 'insmod genl_kernel.ko'"
+	@echo "uninstall 	- rmmod genl_kernel.ko"
+	@echo "run 		- 'make install;make run_user;make uninstall'"
+	@echo "all_user 	- build genl_user"
+	@echo "clean_user 	- clean genl_user"
+	@echo "run_user 	- make all_user; ./genl_user -s"
+
 all:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 	make all_user
@@ -29,4 +40,4 @@ clean_user:
 
 run_user:
 	make all_user
-	./genl_user -r
+	./genl_user -s
